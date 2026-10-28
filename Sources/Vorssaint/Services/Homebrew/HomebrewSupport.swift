@@ -302,10 +302,14 @@ struct HomebrewPendingAction {
 enum HomebrewTerminalScript {
     static func contents(command: String, shellPath: String) -> String {
         let shell = shellPath.isEmpty ? "/bin/sh" : shellPath
+        // csh and tcsh accept -l only as their sole argument. Their interactive
+        // command mode still reads the shell's startup configuration.
+        let name = URL(fileURLWithPath: shell).lastPathComponent
+        let arguments = ["csh", "tcsh"].contains(name) ? "-i -c" : "-l -i -c"
         return """
         #!/bin/sh
         rm -f -- "$0"
-        exec \(HomebrewCommandBuilder.shellQuote(shell)) -l -i -c \(HomebrewCommandBuilder.shellQuote(command))
+        exec \(HomebrewCommandBuilder.shellQuote(shell)) \(arguments) \(HomebrewCommandBuilder.shellQuote(command))
 
         """
     }

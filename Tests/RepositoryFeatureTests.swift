@@ -871,6 +871,29 @@ enum RepositoryFeatureTests {
                    + "and interactive shell, the way Terminal ran it before, found \(arguments)")
             suite.expect(script.map { !FileManager.default.fileExists(atPath: $0.path) } ?? false,
                    "the terminal script deletes itself as it runs")
+            do {
+                for shellPath in ["/bin/csh", "/bin/tcsh"] {
+                    let output = folder.appendingPathComponent(URL(fileURLWithPath: shellPath).lastPathComponent)
+                    let command = "/usr/bin/printf '%s' 'terminal handoff' > "
+                        + HomebrewCommandBuilder.shellQuote(output.path)
+                    let script = try HomebrewTerminalScript.write(command: command,
+                                                                   shellPath: shellPath, directory: folder)
+                    let process = Process()
+                    process.executableURL = script
+                    let input = Pipe()
+                    process.standardInput = input
+                    try process.run()
+                    try input.fileHandleForWriting.close()
+                    process.waitUntilExit()
+                    suite.expect(process.terminationStatus == 0
+                                 && (try? String(contentsOf: output, encoding: .utf8)) == "terminal handoff",
+                                 "the production terminal script runs commands in \(shellPath)")
+                    suite.expect(!FileManager.default.fileExists(atPath: script.path),
+                                 "the \(shellPath) terminal script removes itself")
+                }
+            } catch {
+                suite.expect(false, "could not run the csh terminal handoff: \(error)")
+            }
             suite.expect((try? HomebrewTerminalScript.write(command: command, shellPath: shell.path,
                                                             directory: folder.appendingPathComponent("missing"))) == nil,
                    "a terminal script that cannot be written reports an error instead of opening nothing")
